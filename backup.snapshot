@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+
+DEST='/your/backup/location/Backup'
+SRC='/location/tobackup'
+
+# Timestamp for this backup
+timestamp_s=`date +"%Y-%m-%d-%k%M%S"`
+
+## OS X Excludes
+RSYNC_EXCLUDE="--exclude '.Trashes'"
+RSYNC_EXCLUDE="--exclude '.Trash'"
+RSYNC_EXCLUDE="$RSYNC_EXCLUDE --exclude '.Spotlight-V100'"
+RSYNC_EXCLUDE="$RSYNC_EXCLUDE --exclude '.DS_Store'"
+RSYNC_EXCLUDE="$RSYNC_EXCLUDE -exclude '._.DS_Store'"
+    
+## Play Nice with BT Sync
+RSYNC_EXCLUDE="$RSYNC_EXCLUDE --exclude '.sync'"
+
+## TODO SRC must end in '/'
+
+## Expand Hostname string
+DEST="$DEST/$HOSTNAME/$SRC"
+
+echo "Backing up '$SRC' to '$DEST'"
+
+# check DEST exists
+if [[ ! -d "$DEST" ]]; then mkdir -p "$DEST"; fi
+echo "Backup Destination is: $DEST/$timestamp_s"
+
+last_backup=`ls $DEST | grep "^\d\d\d\d-\d\d-\d\d-\d\d\d\d\d\d" | sort -n -r | head -1`
+echo "Last Back up is: $last_backup"
+
+if [[ $last_backup == '' ]]; then
+  # First Run, No Existing backups
+  echo "rsync -av --delete $RSYNC_EXCLUDE $SRC/  $DEST/$timestamp_s"
+  eval  rsync -av --delete $RSYNC_EXCLUDE $SRC/  $DEST/$timestamp_s
+else
+  # else perform incremental (hard link) backup
+  #rsync -a --delete --link-dest=../backup.1 source_directory/  backup.0/
+  echo "rsync -av --delete $RSYNC_EXCLUDE --link-dest=$DEST/$last_backup  $SRC/  $DEST/$timestamp_s"
+  eval  rsync -av --delete $RSYNC_EXCLUDE --link-dest=$DEST/$last_backup  $SRC/  $DEST/$timestamp_s
+fi
+
+## Update latest backup Pointer
+if [[ -L "$DEST/Latest" ]]; then rm "$DEST/Latest"; fi
+eval ln -s $DEST/$timestamp_s $DEST/Latest
+
+echo "Backup complete"
+echo "$DEST/Latest"
